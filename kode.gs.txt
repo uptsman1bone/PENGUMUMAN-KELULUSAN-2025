@@ -1,0 +1,93 @@
+function doGet(e) {
+  const spreadsheetId = "_ID SPREADSHEET_";
+  const sheetSetting = "SETTING";
+  const sheetData = "DATA";
+  const mode = e.parameter.mode;
+  let result = {};
+
+  if (mode === "load") {
+    const sheetSettingData = getSheetData(spreadsheetId, sheetSetting, 1, 3); // Ambil data mulai dari baris ke-3
+    const usernamenya = getUsername(spreadsheetId, sheetData, 1, 3); // Ambil kolom B dan C mulai baris ke-3
+    result = { 
+      setting: sheetSettingData, 
+      user: usernamenya 
+    };
+  } else if (mode === "login") {
+    const user = e.parameter.user;
+    const pass = e.parameter.pass;
+    const baris = e.parameter.baris;
+    const kolU = e.parameter.kolu;
+    const kolP = e.parameter.kolp;
+    result = login(spreadsheetId, sheetData, user, pass, baris, kolU, kolP);
+  } else{
+    result = { error: "Invalid mode parameter" };
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function getSheetData(spreadsheetId, sheetName, headerRow, startRow) {
+  const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName);
+  if (!sheet) return { error: `Sheet ${sheetName} not found` };
+
+  const lastRow = sheet.getLastRow();
+  const lastColumn = sheet.getLastColumn();
+
+  // Ambil header dari baris pertama
+  const headers = sheet.getRange(headerRow, 1, 1, lastColumn).getValues()[0];
+
+  // Ambil data mulai dari baris ke-3 (atau baris yang ditentukan)
+  const data = sheet.getRange(startRow, 1, lastRow - startRow + 1, lastColumn).getValues();
+
+  // Buat array JSON
+  const jsonData = data.map(row => {
+    let obj = {};
+    headers.forEach((header, i) => {
+      obj[header] = row[i];
+    });
+    return obj;
+  });
+
+  return jsonData;
+}
+
+// Fungsi baru untuk mendapatkan data dari sheetData dengan hanya kolom B dan C
+function getUsername(spreadsheetId, sheetName, headerRow, startRow) {
+  const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName);
+  if (!sheet) return { error: `Sheet ${sheetName} not found` };
+
+  const lastRow = sheet.getLastRow();
+
+  // Ambil data dari kolom B dan C setelah header
+  const data = sheet.getRange(startRow, 2, lastRow - startRow + 1, 2).getValues(); 
+
+  // Buat array JSON
+  const jsonData = data.map(row => {
+    return { 
+      1: row[0], 
+      2: row[1]
+    };
+  });
+
+  return jsonData;
+}
+
+function login(spreadsheetId, sheetName, username, password, row, kolomUser, kolomPass) {
+  const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName);
+  if (!sheet) return { error: `Sheet ${sheetName} not found` };
+
+  const lastRow = sheet.getLastRow();
+  if (row > lastRow || row < 1) {
+    return { error: `Invalid row number. The row should be between 1 and ${lastRow}` };
+  }
+  const usernameValue = sheet.getRange(row, kolomUser).getValue();
+  const passwordValue = sheet.getRange(row, kolomPass).getValue();
+  const lastColumn = sheet.getLastColumn();
+  // Periksa kecocokan username dan password
+  if (username == usernameValue && password == passwordValue) {
+    const datanya = sheet.getRange(row, 1, 1, lastColumn).getValues();
+    return { status: "success", message: datanya };
+  } else {
+    return { status: "failed", message: "Username/Password salah" };
+  }
+}
